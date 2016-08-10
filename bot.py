@@ -13,8 +13,8 @@ import requests
 import youtube_dl
 import validators
 
-api = '09d7cba6f5984e03a6c45b7bf7974d5b'  # API Key for OpenWaetherMap 
-api_key = 'AIzaSyDkYPZizZ7FdlzAcLYb_PlDVQrVNONQBHo' #API key for Google(Url shortening) 
+api = ''  # API Key for OpenWaetherMap 
+api_key = '' #API key for Google(Url shortening) 
 owm = pyowm.OWM(api)
 forecast = owm.daily_forecast("Delhi,in") # Weather forecast details
 tomorrow = pyowm.timeutils.tomorrow()
@@ -197,7 +197,7 @@ If result does'nt come in 30 seconds,Try again.Little patience is appreciated...
 
 # Here is the Telegram Bot API key
 
-key = '221225786:AAElg0gODaJi7-xy0AM68eKH5moyuXZOzh0' # API key for telegram bot
+key = '' # API key for telegram bot
 bot = telepot.Bot(key) 
 bot.message_loop(handle) # Calling bot and keeping it active infinitely
 print ('I am listening ...')
