@@ -11,9 +11,10 @@ import subprocess
 import bs4
 import requests
 import youtube_dl
+import validators
 
-api = ''  # API Key for OpenWaetherMap 
-api_key = '' #API key for Google(Url shortening) 
+api = '09d7cba6f5984e03a6c45b7bf7974d5b'  # API Key for OpenWaetherMap 
+api_key = 'AIzaSyDkYPZizZ7FdlzAcLYb_PlDVQrVNONQBHo' #API key for Google(Url shortening) 
 owm = pyowm.OWM(api)
 forecast = owm.daily_forecast("Delhi,in") # Weather forecast details
 tomorrow = pyowm.timeutils.tomorrow()
@@ -22,7 +23,21 @@ observation = owm.weather_at_place('Delhi,in')  #Hardcoding the weather place to
 w = observation.get_weather() 
 def handle(msg):
     chat_id = msg['chat']['id']  # Stores chat id for referencing message
-    command = msg['text'] # Filters text from the message sent
+    try:
+        command = msg['text'] # Filters text from the message sent
+    except KeyError as k:
+        try:
+            file_id=(msg['photo'][2])['file_id']
+            file_path=bot.getFile(file_id)
+            f_path="https://api.telegram.org/file/bot221225786:AAElg0gODaJi7-xy0AM68eKH5moyuXZOzh0/"+file_path['file_path']
+            #file=bot.download_file(f_path)
+            bot.sendPhoto(chat_id,file_id)
+            return
+        except e:
+            print(e)
+            command="Not Applicable"
+            bot.sendMessage(chat_id,"Please try again with a command or an image /help")
+            return
 
     print ('Got command: %s' % command)
    # Here Starts the command interpretation
@@ -36,11 +51,23 @@ def handle(msg):
         bot.sendMessage(chat_id, "Hello")
     
     elif command == '/weather':
-        bot.sendMessage(chat_id,"New Delhi,India\n" + w.get_detailed_status() + "\n\nTemperature Detials:\n" + str(w.get_temperature(unit='celsius'))+ "\n\nWind Speed Details:\n" + str(w.get_wind())+"\n\nCloud Coverage: \n" + str(w.get_clouds())+"%"+"\n\nHumidity: \n" + str(w.get_humidity())+"%"+"\n\nPressure Details :\n" + str(w.get_pressure())+"\n\nData fetched by openweathermap API.All copyrights reserved")
+        temperature="Temperature > "+str(w.get_temperature(unit='celsius')['temp'])+" degree celcius\nMaximum Temperature > "+str(w.get_temperature(unit='celsius')['temp_max'])+" degree celcius\nMinimum Temperature > "+str(w.get_temperature(unit='celsius')['temp_min'])+" degree celcius"
+        wind="Speed > "+str(w.get_wind()['speed'])+"\nDegrees > "+str(w.get_wind()['deg'])+" degrees clockwise from North direction"
+        pressure="Sea Level > "+str(w.get_pressure()['sea_level'])+"\nPressure > "+str(w.get_pressure()['press'])
+        bot.sendMessage(chat_id,"New Delhi,India\n( " + w.get_detailed_status() + " )\n\nTemperature Details :\n" + temperature+ "\n\nWind Speed Details :\n" +wind +"\n\nCloud Coverage : \n" + str(w.get_clouds())+"%"+"\n\nHumidity : \n" + str(w.get_humidity())+"%"+"\n\nPressure Details :\n" + pressure+"\n\nData fetched by openweathermap API.All copyrights reserved")
     
     elif '/wiki' in command :
-        ny = wikipedia.summary(command[5:len(str(command))],sentences = 7)
-        bot.sendMessage(chat_id,ny)
+        try:
+            ny = wikipedia.summary(command[5:len(str(command))],sentences = 7)
+            bot.sendMessage(chat_id,ny)
+        except wikipedia.exceptions.DisambiguationError as e:
+            stri="This may refer to :\n\n"
+            for i,topic in enumerate(e.options):
+                stri=stri+str(i)+" "+topic+"\n"
+            stri=stri+"\nPlease choose anyone from above options"
+            bot.sendMessage(chat_id,stri)
+        except wikipedia.exceptions.PageError as e:
+            bot.sendMessage(chat_id,"No partial/full match found for this")
     
     elif command == '/help' :
         bot.sendMessage(chat_id,"""List of supported commands is\n
@@ -66,25 +93,36 @@ For Commands with parameters,you can long tap the autosuggestion for quick typin
     elif command == '/torrent_status':
         p = os.popen("deluge-console info")
         q = p.read()
-        bot.sendMessage(chat_id,str(q))
+        try:
+            bot.sendMessage(chat_id,str(q))
+        except telepot.exception.TelegramError as e:
+            bot.sendMessage(chat_id,"No added torrents found for remote download")
         p.close()
     
     elif '/url ' in command :
         url = str(command[5:len(command)])
-        bot.sendMessage(chat_id,"Shortened URL is\n" + str(shortener.short(url)))
+        if validators.url(url):
+            shortener = Shortener('Google', api_key=api_key)
+            bot.sendMessage(chat_id,"Shortened URL is\n" + str(shortener.short(url)))
+        else:
+            bot.sendMessage(chat_id,"Please enter a valid url")
     
     elif '/url_exp ' in command:
         url = str(command[9:len(command)])
+        shortener = Shortener('Google', api_key=api_key)
         bot.sendMessage(chat_id,"Expanded URL is\n" + shortener.expand(url))
     
     elif command == '/speedtest':
         bot.sendMessage(chat_id,"""Wait for a while until we check and measure speed of system's network.
 If result does'nt come in 30 seconds,Try again.Little patience is appreciated...""")
-        p = str(subprocess.check_output(["speedtest-cli"]))
-        q = p[2:len(p)-1]
-        r = q.replace("\\r","")
-        s = r.split("\\n")
-        bot.sendMessage(chat_id,'\n'.join(s))
+        try:
+            p = str(subprocess.check_output(["speedtest-cli"]))
+            q = p[2:len(p)-1]
+            r = q.replace("\\r","")
+            s = r.split("\\n")
+            bot.sendMessage(chat_id,'\n'.join(s))
+        except:
+            bot.sendMessage(chat_id,"Something went wrong,Please try again\n    Or\nTry some other commands /help")
     
     elif '/news ' in command :
         headers = {'user-agent': 'Mozilla/5.0 (Windows NT 6.1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2228.0 Safari/537.36'}
@@ -92,6 +130,7 @@ If result does'nt come in 30 seconds,Try again.Little patience is appreciated...
         tempurl = "https://www.google.com/search?q=%s&num=10&start=10&tbm=nws#q=%s&tbas=0&tbs=sbd:1&tbm=nws&gl=d"
         news_topic = command[6:]
         url = tempurl % (news_topic,news_topic)
+        print(url)
 
         ahrefs = []
         titles = []
@@ -117,9 +156,18 @@ If result does'nt come in 30 seconds,Try again.Little patience is appreciated...
         #print(ahrefs)
         titles = str(titles)
         titles = titles.strip("[[]]")
-        titles = titles.replace("u'",'u"')
-        titles = titles.split('u"')
-        bot.sendMessage(chat_id, "Top 10 latest news headlines for the given topic are\n"+ "\n\n->".join(map(str,titles)))
+        titles = titles.replace('"','\'')
+        titles=" "+titles
+        tit = titles.split(',')
+        ans=""
+        k=0
+        for i in tit:
+            if str(i)[0] == " " and str(i)[1]== "'":
+                ans=ans+"\n"+str(k+1)+".  "+str(i)
+                k=k+1
+            else:
+                ans=ans+"\n"+str(i)
+        bot.sendMessage(chat_id, "Top "+str(k) +" latest news headlines for the given topic are :\n\n"+ans)
 
     elif '/yt ' in command :
         bot.sendMessage(chat_id,"Wait until we create the download link,Sitback and relax..")
@@ -140,20 +188,19 @@ If result does'nt come in 30 seconds,Try again.Little patience is appreciated...
            bot.sendMessage(chat_id,"Download link for given youtube video is:\n" + p)
 
     
-    elif:'/cal ' in command
+    elif '/cal ' in command:
         ans = eval(str(command[5:len(command)])) 
-        bot.sendMessage(chat_id,"Answer is\n" + ans)
+        bot.sendMessage(chat_id,"Answer is:\n" + ans)
     
     else :
         bot.sendMessage(chat_id,"Type /help for list of supported commands till now,There are many more to come!!")
 
 # Here is the Telegram Bot API key
 
-key = '' # API key for telegram bot
+key = '221225786:AAElg0gODaJi7-xy0AM68eKH5moyuXZOzh0' # API key for telegram bot
 bot = telepot.Bot(key) 
 bot.message_loop(handle) # Calling bot and keeping it active infinitely
 print ('I am listening ...')
 
 while 1:
     time.sleep(10)
-    
